@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Alunos - Academia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background: url('https://i.postimg.cc/CLLYzcZL/Imagem-do-Whats-App-de-2025-08-28-s-20-56-28-923c562d.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 40;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal {
+            transform: translateY(-20px) scale(0.95);
+            opacity: 0;
+            transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+        }
+        .modal-backdrop.flex { display: flex; }
+        .modal-backdrop.flex .modal {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+        .tab-btn { transition: background-color 0.2s, color 0.2s; }
+        .tab-active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        h1 { font-family: "Outfit", sans-serif; }
+        input[type="search"]::-webkit-search-cancel-button {
+            -webkit-appearance: none;
+            height: 1em;
+            width: 1em;
+            background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239CA3AF'><path d='M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z'/></svg>") center/contain no-repeat;
+            cursor: pointer;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #2d3748;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 50;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        .student-row-selected {
+            background-color: #374151; /* gray-700 */
+        }
+        #action-panel button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="text-gray-200 antialiased">
+
+    <div class="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <img src="https://i.ibb.co/BKn30R5m/Logo-Desenho-Flor-de-L-tus-Branco.png" alt="Logo Corpo & Saúde" class="mx-auto h-24 w-auto mb-4">
+            <h1 class="text-3xl sm:text-4xl font-bold text-white">Corpo & Saúde</h1>
+            <p class="text-gray-400 mt-2">Matrículas, pagamentos e vencimentos.</p>
+        </header>
+
+        <!-- Botões de Ação Principal -->
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-8">
+            <button id="open-add-modal-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 shadow-lg text-lg w-full sm:w-auto">
+                + Adicionar Novo Aluno
+            </button>
+            <div class="relative dropdown inline-block">
+                 <button id="dropdown-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 w-full sm:w-auto">Importação e Exportação</button>
+                 <div class="dropdown-content mt-2 right-0">
+                    <a href="#" id="import-sheet-btn" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-700">Importar Planilha</a>
+                    <a href="#" id="import-json-btn" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-700">Importar JSON</a>
+                    <a href="#" id="export-btn" class="block px-4 py-3 text-sm text-gray-200 hover:bg-gray-700">Exportar JSON</a>
+                 </div>
+            </div>
+            <input type="file" id="import-sheet-input" class="hidden" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+            <input type="file" id="import-json-input" class="hidden" accept=".json">
+        </div>
+
+        <!-- Seção da Lista de Alunos com Abas -->
+        <div class="bg-gray-800/80 backdrop-blur-sm p-4 sm:p-6 rounded-lg shadow-lg">
+            <div class="flex flex-col md:flex-row justify-between border-b border-gray-700 mb-4 pb-4 gap-4 relative">
+                <div class="flex-grow">
+                    <!-- Mobile header: Title + Hamburger -->
+                    <div class="md:hidden flex justify-between items-center">
+                         <h2 id="mobile-tab-title" class="text-xl font-bold text-white">Alunos Ativos</h2>
+                         <button id="hamburger-btn" class="p-2 rounded-md hover:bg-gray-700">
+                             <img src="https://www.svgrepo.com/show/524617/hamburger-menu.svg" alt="Menu" class="h-6 w-6" style="filter: invert(1);">
+                         </button>
+                    </div>
+
+                    <!-- Tab Buttons Container -->
+                    <div id="tabs-wrapper" class="hidden absolute top-full left-0 w-full bg-gray-800 p-2 z-50 rounded-b-lg shadow-xl md:shadow-none md:rounded-none md:p-0 md:static md:flex md:flex-wrap md:bg-transparent">
+                        <button id="tab-active" class="tab-btn tab-active py-2 px-4 font-semibold rounded-md md:rounded-t-md w-full text-left md:w-auto md:text-center">Alunos Ativos</button>
+                        <button id="tab-pending" class="tab-btn py-2 px-4 font-semibold text-gray-400 hover:text-white rounded-md md:rounded-t-md w-full text-left md:w-auto md:text-center">Pagamentos Pendentes</button>
+                        <button id="tab-total" class="tab-btn py-2 px-4 font-semibold text-gray-400 hover:text-white rounded-md md:rounded-t-md w-full text-left md:w-auto md:text-center">Histórico de Faturamento</button>
+                        <button id="tab-details" class="tab-btn py-2 px-4 font-semibold text-gray-400 hover:text-white rounded-md md:rounded-t-md w-full text-left md:w-auto md:text-center">Detalhes do Aluno</button>
+                        <button id="tab-archived" class="tab-btn py-2 px-4 font-semibold text-gray-400 hover:text-white rounded-md md:rounded-t-md w-full text-left md:w-auto md:text-center">Arquivados</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="sort-container" class="relative">
+                         <select id="sort-order" class="bg-gray-700 border border-gray-600 rounded-md py-2 px-3 focus:ring-2 focus:ring-blue-500">
+                            <option value="dueDate">Ordenar por Vencimento</option>
+                            <option value="alphabetical">Ordenar por Nome</option>
+                            <option value="paymentMethod">Ordenar por Tipo de Pgto.</option>
+                        </select>
+                    </div>
+                    <div id="search-container-main" class="relative">
+                        <input type="search" id="search-input-main" placeholder="Pesquisar aluno..." class="bg-gray-700 border border-gray-600 rounded-md py-2 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 w-full sm:w-64">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path></svg>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="md:grid md:grid-cols-12 md:gap-6">
+                <div id="view-container" class="md:col-span-9">
+                    <div id="view-main">
+                        <!-- Desktop Table View -->
+                        <div class="hidden md:block overflow-x-auto">
+                            <table class="w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-700/50">
+                                    <tr>
+                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">#</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nome</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Plano</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Frequência</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Preço</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Vencimento</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Último Pgto.</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Data Registro</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-list" class="divide-y divide-gray-700"></tbody>
+                            </table>
+                        </div>
+                        <!-- Mobile Card View -->
+                        <div id="student-list-mobile" class="space-y-4 md:hidden">
+                            <!-- Mobile cards will be injected here -->
+                        </div>
+                    </div>
+
+                    <div id="view-total" class="hidden p-4">
+                        <h2 class="text-xl font-bold text-white mb-4">Histórico de Faturamento</h2>
+                        <div id="total-value-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        </div>
+                    </div>
+
+                    <div id="view-details" class="hidden">
+                        <div class="hidden md:block overflow-x-auto">
+                            <table class="w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-700/50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nome</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Professor</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Horário</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Telefone</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nascimento</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Gênero</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Data Registro</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-details-list" class="divide-y divide-gray-700"></tbody>
+                            </table>
+                        </div>
+                        <div id="student-details-list-mobile" class="space-y-4 md:hidden"></div>
+                    </div>
+
+                    <div id="view-archived" class="hidden">
+                         <div class="hidden md:block overflow-x-auto">
+                            <table class="w-full divide-y divide-gray-700">
+                                <thead class="bg-gray-700/50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Nome</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Plano</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Data Arquivado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="archived-list" class="divide-y divide-gray-700"></tbody>
+                            </table>
+                        </div>
+                        <div id="archived-list-mobile" class="space-y-4 md:hidden"></div>
+                    </div>
+                     <div id="no-students-message" class="text-center py-8 text-gray-400">
+                        <p>Nenhum aluno encontrado.</p>
+                    </div>
+                </div>
+
+                <!-- Action Panel (Desktop) -->
+                <div id="action-panel" class="hidden md:block md:col-span-3">
+                    <div class="bg-gray-700/50 rounded-lg p-4 sticky top-6">
+                        <h3 class="text-lg font-bold text-white mb-1">Ações</h3>
+                        <p class="text-sm text-gray-400 mb-4" id="action-panel-student-name">Selecione um aluno</p>
+                        <div class="space-y-3">
+                             <button id="action-pay" class="w-full text-white bg-green-600 hover:bg-green-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors" disabled>Pagar</button>
+                             <button id="action-edit" class="w-full text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors" disabled>Editar</button>
+                             <button id="action-archive" class="w-full text-white bg-yellow-600 hover:bg-yellow-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors" disabled>Arquivar</button>
+                             <button id="action-unarchive" class="w-full text-white bg-green-600 hover:bg-green-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors hidden" disabled>Desarquivar</button>
+                             <button id="action-delete" class="w-full text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors" disabled>Excluir</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    
+    <footer class="text-center p-4 mt-8">
+        <button id="delete-all-btn" class="bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300 shadow-lg text-sm">
+            Excluir Todos os Alunos
+        </button>
+    </footer>
+
+    <!-- Modals -->
+    <div id="student-modal" class="modal-backdrop">
+        <div class="modal bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-2xl font-bold text-white mb-6" id="modal-title">Adicionar Novo Aluno</h3>
+            <form id="student-form">
+                <input type="hidden" id="student-id">
+                <div class="space-y-4">
+                    <fieldset class="border border-gray-600 p-4 rounded-md">
+                        <legend class="px-2 text-lg font-semibold text-blue-400">Informações Principais</legend>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                            <div>
+                                <label for="student-name" class="block text-sm font-medium text-gray-300 mb-1">Nome do Aluno*</label>
+                                <input type="text" id="student-name" placeholder="Nome completo" required class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="start-date" class="block text-sm font-medium text-gray-300 mb-1">Data de Matrícula*</label>
+                                <input type="date" id="start-date" required class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                             <div id="due-date-container">
+                                <label for="due-date" class="block text-sm font-medium text-gray-300 mb-1">Data de Vencimento*</label>
+                                <input type="date" id="due-date" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="membership-plan" class="block text-sm font-medium text-gray-300 mb-1">Plano*</label>
+                                <select id="membership-plan" required class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                                    <option value="Mensal">Mensal</option>
+                                    <option value="Trimestral">Trimestral</option>
+                                    <option value="Semestral">Semestral</option>
+                                    <option value="Anual">Anual</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="frequency" class="block text-sm font-medium text-gray-300 mb-1">Frequência*</label>
+                                <select id="frequency" required class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                                    <option value="2">2x na semana</option>
+                                    <option value="3">3x na semana</option>
+                                    <option value="6">Livre</option>
+                                </select>
+                            </div>
+                             <div>
+                                <label for="student-teacher" class="block text-sm font-medium text-gray-300 mb-1">Professor*</label>
+                                <select id="student-teacher" required class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                                    <option value="Yuri">Yuri</option>
+                                    <option value="Luana">Luana</option>
+                                    <option value="Dayane">Dayane</option>
+                                </select>
+                            </div>
+                             <div>
+                                <label for="student-schedule" class="block text-sm font-medium text-gray-300 mb-1">Horário do Aluno (Opcional)</label>
+                                <select id="student-schedule" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Não informado</option>
+                                    <option value="Manhã">Manhã</option>
+                                    <option value="Tarde">Tarde</option>
+                                    <option value="Noite">Noite</option>
+                                </select>
+                            </div>
+                             <div>
+                                <label for="registration-time" class="block text-sm font-medium text-gray-300 mb-1">Hora do Registro (Opcional)</label>
+                                <input type="time" id="registration-time" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                             <div id="payment-method-container">
+                                <label for="payment-method" class="block text-sm font-medium text-gray-300 mb-1">Forma de Pagamento*</label>
+                                <select id="payment-method" required class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                                    <option value="Pix">Pix</option>
+                                    <option value="Dinheiro">Dinheiro</option>
+                                    <option value="Cartão">Cartão</option>
+                                </select>
+                            </div>
+                             <div class="sm:col-span-2 lg:col-span-3">
+                                <label for="plan-price-input" class="block text-sm font-medium text-gray-300 mb-1">Preço do Plano (R$)*</label>
+                                <input type="number" step="0.01" id="plan-price-input" required class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </fieldset>
+                     <fieldset class="border border-gray-600 p-4 rounded-md">
+                        <legend class="px-2 text-lg font-semibold text-blue-400">Informações Adicionais (Opcional)</legend>
+                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                            <div>
+                                <label for="student-phone" class="block text-sm font-medium text-gray-300 mb-1">Telefone</label>
+                                <input type="tel" id="student-phone" placeholder="(XX) XXXXX-XXXX" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="student-birthdate" class="block text-sm font-medium text-gray-300 mb-1">Data de Nascimento</label>
+                                <input type="date" id="student-birthdate" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label for="student-gender" class="block text-sm font-medium text-gray-300 mb-1">Gênero</label>
+                                <select id="student-gender" class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Prefiro não informar</option>
+                                    <option value="Masculino">Masculino</option>
+                                    <option value="Feminino">Feminino</option>
+                                    <option value="Outro">Outro</option>
+                                </select>
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+                <div class="flex justify-between items-center mt-6">
+                    <button type="button" id="modal-delete-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-md transition hidden">Excluir</button>
+                    <div class="flex gap-4">
+                        <button type="button" id="modal-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md transition">Cancelar</button>
+                        <button type="submit" id="modal-save-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition">Salvar</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="payment-modal" class="modal-backdrop">
+        <div class="modal bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-2xl font-bold text-white mb-2">Registrar Pagamento</h3>
+            <p class="text-gray-400 mb-6">Para <span id="payment-student-name" class="font-semibold"></span></p>
+            <form id="payment-form">
+                <input type="hidden" id="payment-student-id">
+                <div class="space-y-4">
+                    <div class="flex items-center gap-4">
+                        <input type="checkbox" id="pay-pix-check" data-target="pay-pix-amount" class="h-5 w-5 rounded bg-gray-700 border border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <label for="pay-pix-check" class="w-20">Pix</label>
+                        <input type="number" step="0.01" id="pay-pix-amount" placeholder="Valor no Pix" disabled class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 disabled:opacity-50">
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <input type="checkbox" id="pay-dinheiro-check" data-target="pay-dinheiro-amount" class="h-5 w-5 rounded bg-gray-700 border border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <label for="pay-dinheiro-check" class="w-20">Dinheiro</label>
+                        <input type="number" step="0.01" id="pay-dinheiro-amount" placeholder="Valor em Dinheiro" disabled class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 disabled:opacity-50">
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <input type="checkbox" id="pay-cartao-check" data-target="pay-cartao-amount" class="h-5 w-5 rounded bg-gray-700 border border-gray-600 text-blue-600 focus:ring-blue-500">
+                        <label for="pay-cartao-check" class="w-20">Cartão</label>
+                        <input type="number" step="0.01" id="pay-cartao-amount" placeholder="Valor no Cartão" disabled class="w-full bg-gray-900 border border-gray-600 rounded-md p-2 disabled:opacity-50">
+                    </div>
+                </div>
+                <div class="mt-6 bg-gray-700/50 p-3 rounded-md text-center">
+                    <span class="text-gray-400">Total Pago: </span>
+                    <span id="total-paid" class="text-xl font-bold text-white">R$ 0,00</span>
+                    <span class="text-gray-400"> / </span>
+                    <span id="plan-due-price" class="text-lg font-semibold text-gray-300">R$ 0,00</span>
+                </div>
+                 <p id="payment-warning" class="text-center text-yellow-400 text-sm mt-2 hidden">O valor pago é diferente do valor do plano.</p>
+                <div class="flex justify-end gap-4 mt-6">
+                    <button type="button" id="payment-modal-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md transition">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-md transition">Confirmar Pagamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="confirmation-modal" class="modal-backdrop">
+        <div class="modal bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-bold text-white" id="confirm-modal-title">Confirmar Ação</h3>
+            <p class="text-gray-300 my-4" id="confirm-modal-body">Você tem certeza?</p>
+            <div class="flex justify-end gap-4 mt-6">
+                <button id="confirm-modal-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md transition">Cancelar</button>
+                <button id="confirm-modal-confirm-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-md transition">Confirmar</button>
+            </div>
+        </div>
+    </div>
+    <div id="alert-modal" class="modal-backdrop">
+        <div class="modal bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 class="text-xl font-bold text-yellow-400" id="alert-modal-title">Aviso</h3>
+            <p class="text-gray-300 my-4" id="alert-modal-body">Mensagem de alerta.</p>
+            <div class="flex justify-end gap-4 mt-6">
+                <button id="alert-modal-ok-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md transition">OK</button>
+            </div>
+        </div>
+    </div>
+    <div id="import-options-modal" class="modal-backdrop">
+        <div class="modal bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-lg mx-4">
+            <h3 class="text-xl font-bold text-white" id="import-options-title">Importar Alunos</h3>
+            <p class="text-gray-300 my-4" id="import-options-body">Foram encontrados X alunos. Como você deseja importar os dados?</p>
+            <div class="flex flex-col sm:flex-row justify-end gap-4 mt-6">
+                <button id="import-options-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-md transition w-full sm:w-auto">Cancelar</button>
+                <button id="import-options-replace-btn" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-md transition w-full sm:w-auto">Substituir</button>
+                <button id="import-options-add-btn" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-md transition w-full sm:w-auto">Adicionar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Elementos da UI ---
+        const studentList = document.getElementById('student-list');
+        const studentListMobile = document.getElementById('student-list-mobile');
+        const studentDetailsList = document.getElementById('student-details-list');
+        const studentDetailsListMobile = document.getElementById('student-details-list-mobile');
+        const archivedList = document.getElementById('archived-list');
+        const archivedListMobile = document.getElementById('archived-list-mobile');
+        const noStudentsMessage = document.getElementById('no-students-message');
+        const searchInputMain = document.getElementById('search-input-main');
+        const sortOrderSelect = document.getElementById('sort-order');
+        
+        // Vistas e Paineis
+        const viewContainer = document.getElementById('view-container');
+        const viewMain = document.getElementById('view-main');
+        const viewTotal = document.getElementById('view-total');
+        const totalValueContent = document.getElementById('total-value-content');
+        const viewDetails = document.getElementById('view-details');
+        const viewArchived = document.getElementById('view-archived');
+        const searchContainerMain = document.getElementById('search-container-main');
+        const sortContainer = document.getElementById('sort-container');
+        const actionPanel = document.getElementById('action-panel');
+        const actionPanelStudentName = document.getElementById('action-panel-student-name');
+        
+        // Modais
+        const studentModal = document.getElementById('student-modal');
+        const paymentModal = document.getElementById('payment-modal');
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const alertModal = document.getElementById('alert-modal');
+        const importOptionsModal = document.getElementById('import-options-modal');
+
+        // Botões
+        const openAddModalBtn = document.getElementById('open-add-modal-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const importSheetBtn = document.getElementById('import-sheet-btn');
+        const importSheetInput = document.getElementById('import-sheet-input');
+        const importJsonBtn = document.getElementById('import-json-btn');
+        const importJsonInput = document.getElementById('import-json-input');
+        const dropdownBtn = document.getElementById('dropdown-btn');
+        const dropdownContent = document.querySelector('.dropdown-content');
+        const deleteAllBtn = document.getElementById('delete-all-btn');
+        const hamburgerBtn = document.getElementById('hamburger-btn');
+        const actionPayBtn = document.getElementById('action-pay');
+        const actionEditBtn = document.getElementById('action-edit');
+        const actionArchiveBtn = document.getElementById('action-archive');
+        const actionUnarchiveBtn = document.getElementById('action-unarchive');
+        const actionDeleteBtn = document.getElementById('action-delete');
+
+        // Abas
+        const tabsWrapper = document.getElementById('tabs-wrapper');
+        const mobileTabTitle = document.getElementById('mobile-tab-title');
+        const tabActive = document.getElementById('tab-active');
+        const tabPending = document.getElementById('tab-pending');
+        const tabTotal = document.getElementById('tab-total');
+        const tabDetails = document.getElementById('tab-details');
+        const tabArchived = document.getElementById('tab-archived');
+
+        // Formulário do Aluno
+        const studentForm = document.getElementById('student-form');
+        const modalTitle = document.getElementById('modal-title');
+        const studentIdInput = document.getElementById('student-id');
+        const studentNameInput = document.getElementById('student-name');
+        const startDateInput = document.getElementById('start-date');
+        const dueDateContainer = document.getElementById('due-date-container');
+        const dueDateInput = document.getElementById('due-date');
+        const planInput = document.getElementById('membership-plan');
+        const frequencyInput = document.getElementById('frequency');
+        const teacherInput = document.getElementById('student-teacher');
+        const scheduleInput = document.getElementById('student-schedule');
+        const registrationTimeInput = document.getElementById('registration-time');
+        const paymentMethodInput = document.getElementById('payment-method');
+        const paymentMethodContainer = document.getElementById('payment-method-container');
+        const priceInput = document.getElementById('plan-price-input');
+        const studentPhoneInput = document.getElementById('student-phone');
+        const studentBirthdateInput = document.getElementById('student-birthdate');
+        const studentGenderInput = document.getElementById('student-gender');
+        const cancelStudentModalBtn = document.getElementById('modal-cancel-btn');
+        const modalDeleteBtn = document.getElementById('modal-delete-btn');
+
+        // Formulário de Pagamento
+        const paymentForm = document.getElementById('payment-form');
+        const paymentStudentId = document.getElementById('payment-student-id');
+        const paymentStudentName = document.getElementById('payment-student-name');
+        const paymentCheckboxes = document.querySelectorAll('#payment-form input[type="checkbox"]');
+        const paymentAmounts = document.querySelectorAll('#payment-form input[type="number"]');
+        const totalPaidDisplay = document.getElementById('total-paid');
+        const planDuePriceDisplay = document.getElementById('plan-due-price');
+        const paymentWarning = document.getElementById('payment-warning');
+        const paymentModalCancelBtn = document.getElementById('payment-modal-cancel-btn');
+        
+        // Modal de Confirmação
+        const confirmModalCancelBtn = document.getElementById('confirm-modal-cancel-btn');
+        const confirmModalConfirmBtn = document.getElementById('confirm-modal-confirm-btn');
+
+        // Modal de Alerta
+        const alertModalTitle = document.getElementById('alert-modal-title');
+        const alertModalBody = document.getElementById('alert-modal-body');
+        const alertModalOkBtn = document.getElementById('alert-modal-ok-btn');
+
+        // Modal de Opções de Importação
+        const importOptionsBody = document.getElementById('import-options-body');
+        const importOptionsCancelBtn = document.getElementById('import-options-cancel-btn');
+        const importOptionsReplaceBtn = document.getElementById('import-options-replace-btn');
+        const importOptionsAddBtn = document.getElementById('import-options-add-btn');
+
+        // --- Estrutura de Dados e Variáveis de Estado ---
+        const plans = {
+            'Mensal': { duration: 1, prices: { '2': 90, '3': 100, '6': 120 } },
+            'Trimestral': { duration: 3, prices: { '2': 240, '3': 260, '6': 300 } },
+            'Semestral': { duration: 6, prices: { '2': 450, '3': 480, '6': 540 } },
+            'Anual': { duration: 12, prices: { '2': 840, '3': 900, '6': 1020 } }
+        };
+
+        let students = JSON.parse(localStorage.getItem('gymStudents')) || [];
+        let payments = JSON.parse(localStorage.getItem('gymPayments')) || [];
+        let actionToConfirm = null;
+        let activeTab = 'active';
+        let currentSort = 'dueDate';
+        let selectedStudentId = null;
+
+        // --- Funções de Lógica ---
+        const saveStudents = () => {
+            localStorage.setItem('gymStudents', JSON.stringify(students));
+        };
+        const savePayments = () => {
+            localStorage.setItem('gymPayments', JSON.stringify(payments));
+        };
+        
+        const formatDate = (dateString) => {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            if(isNaN(date.getTime())) return 'N/A';
+            const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+            return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString('pt-BR');
+        };
+        
+        const formatTimestamp = (isoString) => {
+            if (!isoString) return 'N/A';
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return 'N/A';
+            return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+        };
+
+        const calculateDueDate = (startDateString, planName) => {
+            if (!startDateString || !planName || !plans[planName]) return '';
+            const startDate = new Date(startDateString);
+            if (isNaN(startDate.getTime())) return '';
+
+            startDate.setMonth(startDate.getMonth() + plans[planName].duration);
+            return startDate.toISOString().split('T')[0];
+        };
+
+        const getPaymentStatus = (dueDateString) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dueDate = new Date(dueDateString);
+            if(isNaN(dueDate.getTime())) return { text: 'Inválido', color: 'bg-gray-500/20 text-gray-400', textColor: 'text-gray-400', order: 4 };
+            
+            const userTimezoneOffset = dueDate.getTimezoneOffset() * 60000;
+            const correctedDueDate = new Date(dueDate.getTime() + userTimezoneOffset);
+            
+            if (correctedDueDate < today) return { text: 'Vencido', color: 'bg-red-500/20 text-red-400', textColor: 'text-red-400', order: 0 };
+            const timeDiff = correctedDueDate.getTime() - today.getTime();
+            const dayDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            if (dayDiff <= 7) return { text: 'Próximo', color: 'bg-yellow-500/20 text-yellow-400', textColor: 'text-yellow-400', order: 1 };
+            return { text: 'Pago', color: 'bg-green-500/20 text-green-400', textColor: 'text-green-400', order: 2 };
+        };
+        
+        const updatePrice = () => {
+            const plan = planInput.value;
+            const freq = frequencyInput.value;
+            if (plan && freq && plans[plan] && plans[plan].prices[freq]) {
+                const price = plans[plan].prices[freq];
+                priceInput.value = price.toFixed(2);
+            } else {
+                 priceInput.value = '0.00';
+            }
+        };
+
+        // --- Funções de Renderização e UI ---
+        const render = () => {
+            if (selectedStudentId && !students.find(s => s.id === selectedStudentId)) {
+                selectedStudentId = null;
+            }
+
+            switch(activeTab) {
+                case 'active':
+                case 'pending':
+                    renderStudentsList();
+                    break;
+                case 'total':
+                    renderPaymentHistory();
+                    break;
+                case 'details':
+                    renderStudentDetails();
+                    break;
+                case 'archived':
+                    renderArchivedList();
+                    break;
+            }
+            updateActionPanel();
+        };
+
+        const renderStudentsList = () => {
+            const searchTerm = searchInputMain.value.toLowerCase();
+            let filteredStudents = students.filter(s => !s.archived);
+
+            if (activeTab === 'active') {
+                filteredStudents = filteredStudents.filter(s => getPaymentStatus(s.dueDate).text !== 'Vencido');
+            } else if (activeTab === 'pending') {
+                filteredStudents = filteredStudents.filter(s => getPaymentStatus(s.dueDate).text === 'Vencido');
+            }
+            
+            if (searchTerm) {
+                filteredStudents = filteredStudents.filter(s => s.name.toLowerCase().includes(searchTerm));
+            }
+
+            if (currentSort === 'alphabetical') {
+                filteredStudents.sort((a, b) => a.name.localeCompare(b.name));
+            } else if (currentSort === 'paymentMethod') {
+                filteredStudents.sort((a, b) => (a.paymentMethod || '').localeCompare(b.paymentMethod || ''));
+            } else { // dueDate
+                filteredStudents.sort((a, b) => {
+                    const statusA = getPaymentStatus(a.dueDate).order;
+                    const statusB = getPaymentStatus(b.dueDate).order;
+                    if (statusA < statusB) return -1;
+                    if (statusA > statusB) return 1;
+                    return new Date(a.dueDate) - new Date(b.dueDate);
+                });
+            }
+            
+            studentList.innerHTML = '';
+            studentListMobile.innerHTML = '';
+            noStudentsMessage.style.display = filteredStudents.length === 0 ? 'block' : 'none';
+
+            filteredStudents.forEach((student, index) => {
+                const status = getPaymentStatus(student.dueDate);
+                const frequencyText = student.frequency == '6' ? 'Livre' : `${student.frequency}x`;
+                
+                // Desktop Row
+                const row = document.createElement('tr');
+                row.className = `cursor-pointer hover:bg-gray-900/50 transition-colors ${student.id === selectedStudentId ? 'student-row-selected' : ''}`;
+                row.dataset.id = student.id;
+
+                row.innerHTML = `
+                    <td class="px-2 py-4 whitespace-nowrap text-sm font-medium text-gray-400">${index + 1}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-white">${student.name}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${student.plan}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${frequencyText}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-semibold text-white">R$ ${student.price.toFixed(2).replace('.', ',')}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-semibold ${status.textColor}">${formatDate(student.dueDate)}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-center"><span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${status.color}">${status.text}</span></td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${student.paymentMethod || 'N/A'}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${formatTimestamp(student.registrationTimestamp)}</td>
+                `;
+                studentList.appendChild(row);
+
+                // Mobile Card
+                const card = document.createElement('div');
+                card.className = 'bg-gray-700/50 rounded-lg p-4 flex flex-col space-y-3';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <h3 class="text-lg font-bold text-white">${student.name}</h3>
+                        <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${status.color} whitespace-nowrap">${status.text}</span>
+                    </div>
+                    <div class="text-sm text-gray-300 space-y-2 border-b border-t border-gray-600 py-3">
+                        <div class="flex justify-between">
+                            <span class="font-semibold text-gray-400">Vencimento:</span>
+                            <span class="font-semibold ${status.textColor}">${formatDate(student.dueDate)}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Plano:</span>
+                            <span>${student.plan} (${frequencyText})</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Professor:</span>
+                            <span>${student.teacher || 'N/A'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Preço:</span>
+                            <span class="font-semibold">R$ ${student.price.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Último Pgto:</span>
+                            <span>${student.paymentMethod || 'N/A'}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end gap-2 flex-wrap">
+                        <button class="pay-btn text-sm bg-green-600 hover:bg-green-700 px-3 py-2 rounded-md transition-colors" data-id="${student.id}">Pagar</button>
+                        <button class="edit-btn text-sm bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-md transition-colors" data-id="${student.id}">Editar</button>
+                        <button class="archive-btn text-sm bg-yellow-600 hover:bg-yellow-700 px-3 py-2 rounded-md transition-colors" data-id="${student.id}">Arquivar</button>
+                        <button class="delete-btn text-sm bg-red-600 hover:bg-red-700 px-3 py-2 rounded-md transition-colors" data-id="${student.id}">Excluir</button>
+                    </div>
+                `;
+                studentListMobile.appendChild(card);
+            });
+        };
+
+        const renderPaymentHistory = () => {
+            totalValueContent.innerHTML = '';
+            
+            const monthlyTotals = {};
+            // monthlyTotals structure: { 'YYYY-MM': { total: 0, Pix: 0, Dinheiro: 0, Cartão: 0 } }
+
+            payments.forEach(payment => {
+                const paymentDate = new Date(payment.date);
+                const monthYearKey = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}`;
+                
+                if (!monthlyTotals[monthYearKey]) {
+                    monthlyTotals[monthYearKey] = { total: 0, Pix: 0, Dinheiro: 0, Cartão: 0 };
+                }
+
+                monthlyTotals[monthYearKey].total += payment.amount;
+
+                // Handle new breakdown structure or migrate old data
+                if (payment.breakdown && Object.keys(payment.breakdown).length > 0) {
+                    for (const method in payment.breakdown) {
+                        if (monthlyTotals[monthYearKey][method] !== undefined) {
+                            monthlyTotals[monthYearKey][method] += payment.breakdown[method];
+                        }
+                    }
+                } else if (payment.paymentMethods) { // Fallback for old data
+                    const methods = payment.paymentMethods.split('/');
+                    if (methods.length > 0 && methods[0] !== '') {
+                        // Simple heuristic: assign full amount to the first method found
+                        const firstMethod = methods[0];
+                        if (monthlyTotals[monthYearKey][firstMethod] !== undefined) {
+                            monthlyTotals[monthYearKey][firstMethod] += payment.amount;
+                        }
+                    }
+                }
+            });
+
+            const sortedMonths = Object.keys(monthlyTotals).sort().reverse();
+            
+            if(sortedMonths.length === 0) {
+                 noStudentsMessage.innerHTML = '<p>Nenhum pagamento registrado ainda.</p>';
+                 noStudentsMessage.style.display = 'block';
+                 return;
+            }
+             noStudentsMessage.style.display = 'none';
+
+            sortedMonths.forEach(key => {
+                const [year, month] = key.split('-');
+                const monthName = new Date(year, month - 1, 1).toLocaleString('pt-BR', { month: 'long' });
+                const totals = monthlyTotals[key];
+
+                let detailsHtml = '';
+                if (totals.Pix > 0) {
+                    detailsHtml += `<p>Pix: <span class="font-semibold">R$ ${totals.Pix.toFixed(2).replace('.', ',')}</span></p>`;
+                }
+                if (totals.Dinheiro > 0) {
+                    detailsHtml += `<p>Dinheiro: <span class="font-semibold">R$ ${totals.Dinheiro.toFixed(2).replace('.', ',')}</span></p>`;
+                }
+                if (totals.Cartão > 0) {
+                    detailsHtml += `<p>Cartão: <span class="font-semibold">R$ ${totals.Cartão.toFixed(2).replace('.', ',')}</span></p>`;
+                }
+
+                const monthCard = document.createElement('div');
+                monthCard.className = 'bg-gray-700/50 p-4 rounded-lg';
+                monthCard.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-lg font-bold text-white capitalize">${monthName} de ${year}</h4>
+                        <button class="delete-history-btn p-1 rounded-md hover:bg-red-800/50" data-month-year="${key}" title="Excluir histórico deste mês">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="pointer-events: none;">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-3xl font-bold text-green-400 mt-1">R$ ${totals.total.toFixed(2).replace('.', ',')}</p>
+                    <div class="text-sm mt-2 text-gray-300 border-t border-gray-600 pt-2 space-y-1">
+                        ${detailsHtml || '<p>Nenhum detalhe de pagamento.</p>'}
+                    </div>
+                `;
+                totalValueContent.appendChild(monthCard);
+            });
+        };
+
+        const renderStudentDetails = () => {
+            const activeStudents = students.filter(s => !s.archived).sort((a, b) => a.name.localeCompare(b.name));
+            studentDetailsList.innerHTML = '';
+            studentDetailsListMobile.innerHTML = '';
+            noStudentsMessage.style.display = activeStudents.length === 0 ? 'block' : 'none';
+
+            activeStudents.forEach((student) => {
+                 const row = document.createElement('tr');
+                row.className = `cursor-pointer hover:bg-gray-900/50 transition-colors ${student.id === selectedStudentId ? 'student-row-selected' : ''}`;
+                row.dataset.id = student.id;
+                row.innerHTML = `
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-white">${student.name}</td>
+                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${student.teacher || 'N/A'}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${student.schedule || 'N/A'}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${student.phone || 'N/A'}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${formatDate(student.birthDate)}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${student.gender || 'N/A'}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${formatTimestamp(student.registrationTimestamp)}</td>
+                `;
+                studentDetailsList.appendChild(row);
+
+                const card = document.createElement('div');
+                card.className = 'bg-gray-700/50 rounded-lg p-4 flex flex-col space-y-3';
+                card.innerHTML = `
+                    <h3 class="text-lg font-bold text-white">${student.name}</h3>
+                    <div class="text-sm text-gray-300 space-y-2 border-t border-gray-600 pt-3">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Telefone:</span>
+                            <span>${student.phone || 'N/A'}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Nascimento:</span>
+                            <span>${formatDate(student.birthDate)}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">Gênero:</span>
+                            <span>${student.gender || 'N/A'}</span>
+                        </div>
+                    </div>
+                `;
+                studentDetailsListMobile.appendChild(card);
+            });
+        };
+        
+        const renderArchivedList = () => {
+            const archivedStudents = students.filter(s => s.archived).sort((a, b) => a.name.localeCompare(b.name));
+            archivedList.innerHTML = '';
+            archivedListMobile.innerHTML = '';
+            noStudentsMessage.style.display = archivedStudents.length === 0 ? 'block' : 'none';
+
+            archivedStudents.forEach((student) => {
+                const row = document.createElement('tr');
+                row.className = `cursor-pointer hover:bg-gray-900/50 transition-colors ${student.id === selectedStudentId ? 'student-row-selected' : ''}`;
+                row.dataset.id = student.id;
+
+                row.innerHTML = `
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-white">${student.name}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${student.plan}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">${formatDate(student.archivedDate)}</td>
+                `;
+                archivedList.appendChild(row);
+
+                const card = document.createElement('div');
+                card.className = 'bg-gray-700/50 rounded-lg p-4 flex flex-col space-y-3';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <h3 class="text-lg font-bold text-white">${student.name}</h3>
+                        <span class="text-xs text-gray-400 text-right">Arquivado em:<br>${formatDate(student.archivedDate)}</span>
+                    </div>
+                    <div class="text-sm text-gray-300">
+                        <span class="text-gray-400">Plano:</span>
+                        <span>${student.plan}</span>
+                    </div>
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-600">
+                        <button class="unarchive-btn text-sm bg-green-600 hover:bg-green-700 px-3 py-2 rounded-md" data-id="${student.id}">Desarquivar</button>
+                        <button class="delete-btn text-sm bg-red-600 hover:bg-red-700 px-3 py-2 rounded-md" data-id="${student.id}">Excluir</button>
+                    </div>
+                `;
+                archivedListMobile.appendChild(card);
+            });
+        };
+
+        const updateActionPanel = () => {
+            const student = students.find(s => s.id === selectedStudentId);
+            
+            // Default state
+            actionEditBtn.textContent = 'Editar';
+            [actionPayBtn, actionEditBtn, actionArchiveBtn, actionUnarchiveBtn, actionDeleteBtn].forEach(btn => {
+                btn.classList.add('hidden');
+                btn.disabled = true;
+            });
+
+            if (student) {
+                actionPanelStudentName.textContent = student.name;
+                actionDeleteBtn.classList.remove('hidden');
+                actionDeleteBtn.disabled = false;
+
+                if (activeTab === 'details') {
+                    actionEditBtn.textContent = 'Mostrar Informações';
+                    actionEditBtn.classList.remove('hidden');
+                    actionEditBtn.disabled = false;
+                } else if (activeTab === 'archived') {
+                    actionUnarchiveBtn.classList.remove('hidden');
+                    actionUnarchiveBtn.disabled = false;
+                } else { // active, pending
+                    actionPayBtn.classList.remove('hidden');
+                    actionPayBtn.disabled = false;
+                    actionEditBtn.classList.remove('hidden');
+                    actionEditBtn.disabled = false;
+                    actionArchiveBtn.classList.remove('hidden');
+                    actionArchiveBtn.disabled = false;
+                }
+            } else {
+                actionPanelStudentName.textContent = 'Selecione um aluno';
+            }
+        };
+
+        const openStudentModal = (student = null) => {
+            studentForm.reset();
+            if (student) {
+                modalTitle.textContent = 'Editar Aluno';
+                studentIdInput.value = student.id;
+                studentNameInput.value = student.name;
+                startDateInput.value = student.startDate;
+                planInput.value = student.plan;
+                frequencyInput.value = student.frequency;
+                dueDateInput.value = student.dueDate; 
+                teacherInput.value = student.teacher || 'Yuri';
+                scheduleInput.value = student.schedule || '';
+                registrationTimeInput.value = student.registrationTime || '';
+                paymentMethodInput.value = student.paymentMethod || 'Pix';
+                priceInput.value = student.price.toFixed(2);
+                studentPhoneInput.value = student.phone || '';
+                studentBirthdateInput.value = student.birthDate || '';
+                studentGenderInput.value = student.gender || '';
+                dueDateContainer.style.display = 'block'; 
+                paymentMethodContainer.style.display = 'block';
+                modalDeleteBtn.classList.remove('hidden');
+            } else {
+                modalTitle.textContent = 'Adicionar Novo Aluno';
+                studentIdInput.value = '';
+                startDateInput.value = new Date().toISOString().split('T')[0];
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                registrationTimeInput.value = `${hours}:${minutes}`;
+                dueDateContainer.style.display = 'none'; 
+                paymentMethodContainer.style.display = 'block';
+                modalDeleteBtn.classList.add('hidden');
+                updatePrice(); // Set default price for new students
+            }
+            
+            studentModal.classList.add('flex');
+        };
+        
+        const closeStudentModal = () => studentModal.classList.remove('flex');
+
+        const openPaymentModal = (student) => {
+            paymentForm.reset();
+            paymentStudentId.value = student.id;
+            paymentStudentName.textContent = student.name;
+            planDuePriceDisplay.textContent = `R$ ${student.price.toFixed(2).replace('.', ',')}`;
+            paymentCheckboxes.forEach(cb => {
+                const targetInput = document.getElementById(cb.dataset.target);
+                targetInput.disabled = true;
+                targetInput.value = '';
+            });
+            updateTotalPaid(student.price);
+            paymentModal.classList.add('flex');
+        };
+        
+        const closePaymentModal = () => paymentModal.classList.remove('flex');
+
+        const showConfirmationModal = (title, body, confirmClass, onConfirm) => {
+            document.getElementById('confirm-modal-title').textContent = title;
+            document.getElementById('confirm-modal-body').textContent = body;
+            confirmModalConfirmBtn.className = `px-4 py-2 ${confirmClass} text-white font-semibold rounded-md transition`;
+            confirmationModal.classList.add('flex');
+            actionToConfirm = onConfirm;
+        };
+        
+        const hideConfirmationModal = () => {
+            confirmationModal.classList.remove('flex');
+            actionToConfirm = null;
+        };
+        
+        const showAlertModal = (body, title = 'Aviso') => {
+            alertModalTitle.textContent = title;
+            alertModalBody.textContent = body;
+            alertModal.classList.add('flex');
+        };
+
+        const hideAlertModal = () => {
+            alertModal.classList.remove('flex');
+        };
+
+        let importActionHandler = {};
+        const showImportOptionsModal = (importedData) => {
+            importOptionsBody.textContent = `Foram encontrados ${importedData.length} alunos. Como você deseja importar os dados?`;
+            importOptionsModal.classList.add('flex');
+
+            importActionHandler.add = () => {
+                students = students.concat(importedData);
+                saveStudents();
+                render();
+                hideImportOptionsModal();
+            };
+            importActionHandler.replace = () => {
+                students = importedData;
+                saveStudents();
+                render();
+                hideImportOptionsModal();
+            };
+        };
+
+        const hideImportOptionsModal = () => {
+            importOptionsModal.classList.remove('flex');
+        };
+        
+        // --- Funções de Importação/Exportação ---
+        const exportData = () => {
+            if (students.length === 0 && payments.length === 0) {
+                showAlertModal('Não há dados para exportar.');
+                return;
+            }
+            const dataToExport = {
+                students: students,
+                payments: payments,
+            };
+            const dataStr = JSON.stringify(dataToExport, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `dados_academia_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+        
+        const importFromJson = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    if (Array.isArray(importedData)) { // Legacy format
+                        showImportOptionsModal(importedData);
+                    } else if (importedData.students) { // New format
+                         showConfirmationModal('Importar Dados', 'Você deseja substituir todos os dados existentes (alunos e pagamentos) com os dados do arquivo?', 'bg-green-600 hover:bg-green-700', () => {
+                            students = importedData.students || [];
+                            payments = importedData.payments || [];
+                            saveStudents();
+                            savePayments();
+                            render();
+                            hideConfirmationModal();
+                        });
+                    }
+                    else {
+                        throw new Error('O arquivo não contém um formato de dados válido.');
+                    }
+
+                } catch (error) {
+                    showAlertModal(`Erro ao importar o arquivo: ${error.message}`, 'Erro de Importação');
+                } finally {
+                    importJsonInput.value = '';
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        const processImportedData = (data) => {
+            try {
+                let headerRowIndex = -1;
+                let columnMap = {};
+                const requiredHeaders = ['NOME', 'DATA', 'VALOR', 'M/T/S/A'];
+
+                for (let i = 0; i < data.length; i++) {
+                    const row = data[i].map(cell => String(cell || '').toUpperCase().trim());
+                    const foundHeaders = requiredHeaders.filter(header => row.some(cell => cell.includes(header)));
+                    if (foundHeaders.length >= 3) { 
+                        headerRowIndex = i;
+                        row.forEach((cell, index) => {
+                            if (cell.includes('NOME')) columnMap.name = index;
+                            if (cell.includes('DATA')) columnMap.date = index;
+                            if (cell.includes('VALOR')) columnMap.value = index;
+                            if (cell.includes('M/T/S/A')) columnMap.plan = index;
+                            if (cell.includes('PIX') || cell.includes('DINHEIRO')) columnMap.payment = index;
+                        });
+                        break;
+                    }
+                }
+
+                if (headerRowIndex === -1 || columnMap.name === undefined || columnMap.date === undefined || columnMap.value === undefined || columnMap.plan === undefined) {
+                    showAlertModal('Não foi possível encontrar os cabeçalhos necessários (NOME, DATA, VALOR, M/T/S/A) na planilha.');
+                    return;
+                }
+
+                const importedStudents = [];
+                let lastValidRow = {};
+                const planMap = { 'M': 'Mensal', 'T': 'Trimestral', 'S': 'Semestral', 'A': 'Anual' };
+
+                for (let i = headerRowIndex + 1; i < data.length; i++) {
+                    try {
+                        let row = data[i];
+                        if (!row || row.every(cell => cell === null || cell === '')) continue; 
+
+                        row = row.map((cell, index) => (String(cell).trim() === '//' && lastValidRow[index]) ? lastValidRow[index] : cell);
+                        
+                        const name = row[columnMap.name];
+                        let dateValue = row[columnMap.date];
+                        const valueStr = row[columnMap.value];
+                        const paymentMethod = columnMap.payment !== undefined ? row[columnMap.payment] : '';
+                        const planAbbr = row[columnMap.plan];
+
+                        if (!name || !dateValue || valueStr === undefined || valueStr === null || !planAbbr) {
+                            continue; 
+                        }
+                        
+                        let date;
+                        if (typeof dateValue === 'number' && dateValue > 1) {
+                            const excelEpoch = new Date(1899, 11, 30);
+                            const dateObj = new Date(excelEpoch.getTime() + dateValue * 86400000);
+                            const userTimezoneOffset = dateObj.getTimezoneOffset() * 60000;
+                            date = new Date(dateObj.getTime() - userTimezoneOffset).toISOString().split('T')[0];
+                        } else {
+                            date = String(dateValue).trim();
+                        }
+                        
+                        if (isNaN(new Date(date).getTime())) {
+                            console.warn(`Ignorando linha ${i + 1} devido a data inválida:`, date);
+                            continue;
+                        }
+
+                        const value = parseFloat(String(valueStr).replace(',', '.'));
+
+                        if (name && !isNaN(value) && planAbbr) {
+                            const planName = planMap[String(planAbbr).trim().toUpperCase()];
+                            if (planName) {
+                                const newStudent = {
+                                    id: Date.now() + i,
+                                    name: String(name).trim(),
+                                    startDate: date,
+                                    dueDate: calculateDueDate(date, planName),
+                                    plan: planName,
+                                    price: value,
+                                    paymentMethod: paymentMethod ? String(paymentMethod).trim() : 'Pix',
+                                    frequency: Object.keys(plans[planName].prices).find(freq => plans[planName].prices[freq] === value) || '3',
+                                    phone: '', birthDate: '', gender: '',
+                                    archived: false, archivedDate: null,
+                                    registrationTimestamp: new Date().toISOString()
+                                };
+                                importedStudents.push(newStudent);
+                                lastValidRow = row;
+                            }
+                        }
+                    } catch (rowError) {
+                        console.warn(`Erro ao processar a linha ${i + 1} da planilha. Linha ignorada.`, rowError);
+                    }
+                }
+
+                if (importedStudents.length > 0) {
+                    showImportOptionsModal(importedStudents);
+                } else {
+                    showAlertModal('Nenhum aluno válido foi encontrado na planilha. Verifique se os dados estão corretos e nas colunas certas.');
+                }
+
+            } catch (error) {
+                showAlertModal(`Erro ao processar a planilha: ${error.message}`, 'Erro de Processamento');
+            }
+        };
+
+        const handleFileImport = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            const fileExtension = file.name.split('.').pop().toLowerCase();
+
+            if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+                reader.onload = (e) => {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array', cellDates:true});
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                    processImportedData(jsonData);
+                };
+                reader.readAsArrayBuffer(file);
+            } else { 
+                reader.onload = (e) => {
+                    Papa.parse(e.target.result, {
+                        complete: (results) => {
+                            processImportedData(results.data);
+                        }
+                    });
+                };
+                reader.readAsText(file);
+            }
+            event.target.value = ''; 
+        };
+
+        // --- Event Listeners ---
+        openAddModalBtn.addEventListener('click', () => openStudentModal());
+        cancelStudentModalBtn.addEventListener('click', closeStudentModal);
+        studentModal.addEventListener('click', (e) => e.target === studentModal && closeStudentModal());
+
+        const recalculateDueDate = () => {
+            const startDate = startDateInput.value;
+            const plan = planInput.value;
+            if(startDate && plan && !studentIdInput.value) {
+                dueDateInput.value = calculateDueDate(startDate, plan);
+            }
+        }
+
+        startDateInput.addEventListener('change', recalculateDueDate);
+        planInput.addEventListener('change', () => { updatePrice(); recalculateDueDate(); });
+        frequencyInput.addEventListener('change', updatePrice);
+        
+        exportBtn.addEventListener('click', exportData);
+        importSheetBtn.addEventListener('click', (e) => { e.preventDefault(); importSheetInput.click(); });
+        importSheetInput.addEventListener('change', handleFileImport);
+        importJsonBtn.addEventListener('click', (e) => { e.preventDefault(); importJsonInput.click(); });
+        importJsonInput.addEventListener('change', importFromJson);
+        
+        searchInputMain.addEventListener('input', render);
+        sortOrderSelect.addEventListener('change', (e) => {
+            currentSort = e.target.value;
+            render();
+        });
+
+        studentForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = studentIdInput.value;
+            const studentData = {
+                name: studentNameInput.value,
+                startDate: startDateInput.value,
+                plan: planInput.value,
+                frequency: frequencyInput.value,
+                price: parseFloat(priceInput.value) || 0,
+                teacher: teacherInput.value,
+                schedule: scheduleInput.value,
+                registrationTime: registrationTimeInput.value,
+                paymentMethod: paymentMethodInput.value,
+                phone: studentPhoneInput.value,
+                birthDate: studentBirthdateInput.value,
+                gender: studentGenderInput.value,
+            };
+
+            if (id) {
+                const index = students.findIndex(s => s.id == id);
+                if (index !== -1) students[index] = { ...students[index], ...studentData, dueDate: dueDateInput.value };
+            } else {
+                studentData.id = Date.now();
+                studentData.dueDate = calculateDueDate(studentData.startDate, studentData.plan);
+                studentData.archived = false;
+                studentData.archivedDate = null;
+                studentData.registrationTimestamp = new Date().toISOString();
+                students.push(studentData);
+
+                // Create first payment record
+                const firstPayment = {
+                    studentId: studentData.id,
+                    studentName: studentData.name,
+                    amount: studentData.price,
+                    date: new Date().toISOString(),
+                    paymentMethods: studentData.paymentMethod,
+                    breakdown: {
+                        [studentData.paymentMethod]: studentData.price
+                    }
+                };
+                payments.push(firstPayment);
+                savePayments();
+            }
+            saveStudents();
+            render();
+            closeStudentModal();
+        });
+
+        modalDeleteBtn.addEventListener('click', () => {
+            const id = studentIdInput.value;
+            const student = students.find(s => s.id == id);
+            if (!student) return;
+
+            showConfirmationModal('Excluir Permanentemente', `Tem certeza que deseja excluir ${student.name}? Esta ação não pode ser desfeita.`, 'bg-red-600 hover:bg-red-700', () => {
+                students = students.filter(s => s.id != id);
+                saveStudents();
+                hideConfirmationModal();
+                closeStudentModal();
+                render();
+            });
+        });
+        
+        const handleActionClick = (e) => {
+            const target = e.target;
+            let studentId;
+
+            if (target.closest('#action-panel')) {
+                studentId = selectedStudentId;
+            } else {
+                const elementWithId = target.closest('[data-id]');
+                if (elementWithId) {
+                    studentId = Number(elementWithId.dataset.id);
+                }
+            }
+            
+            if (!studentId) return;
+
+            const studentIndex = students.findIndex(s => s.id == studentId);
+            if (studentIndex === -1) return;
+            const student = students[studentIndex];
+
+            if (target.closest('.archive-btn, #action-archive')) {
+                showConfirmationModal('Arquivar Aluno', `Tem certeza que deseja arquivar ${student.name}?`, 'bg-yellow-600 hover:bg-yellow-700', () => {
+                    students[studentIndex].archived = true;
+                    students[studentIndex].archivedDate = new Date().toISOString().split('T')[0];
+                    selectedStudentId = null;
+                    saveStudents();
+                    render();
+                    hideConfirmationModal();
+                });
+            } else if (target.closest('.edit-btn, #action-edit')) {
+                openStudentModal(student);
+            } else if (target.closest('.pay-btn, #action-pay')) {
+                openPaymentModal(student);
+            } else if (target.closest('.unarchive-btn, #action-unarchive')) {
+                showConfirmationModal('Desarquivar Aluno', `Tem certeza que deseja desarquivar ${student.name}?`, 'bg-green-600 hover:bg-green-700', () => {
+                    students[studentIndex].archived = false;
+                    students[studentIndex].archivedDate = null;
+                    selectedStudentId = null;
+                    saveStudents();
+                    render();
+                    hideConfirmationModal();
+                });
+            } else if (target.closest('.delete-btn, #action-delete')) {
+                 showConfirmationModal('Excluir Permanentemente', `Tem certeza que deseja excluir ${student.name}? Todo o histórico de pagamentos deste aluno também será apagado permanentemente.`, 'bg-red-600 hover:bg-red-700', () => {
+                    students = students.filter(s => s.id != studentId);
+                    payments = payments.filter(p => p.studentId != studentId);
+                    selectedStudentId = null;
+                    saveStudents();
+                    savePayments();
+                    render();
+                    hideConfirmationModal();
+                });
+            }
+        };
+
+        viewContainer.addEventListener('click', (e) => {
+            const row = e.target.closest('tr[data-id]');
+            if(row) {
+                selectedStudentId = Number(row.dataset.id);
+                render();
+            }
+        });
+
+        studentListMobile.addEventListener('click', handleActionClick);
+        archivedListMobile.addEventListener('click', handleActionClick);
+        actionPanel.addEventListener('click', handleActionClick);
+        
+        const updateTotalPaid = (planPrice) => {
+            let total = 0;
+            paymentAmounts.forEach(input => {
+                if (!input.disabled) total += parseFloat(input.value) || 0;
+            });
+            totalPaidDisplay.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+            paymentWarning.classList.toggle('hidden', total === planPrice);
+        };
+
+        paymentCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const targetInput = document.getElementById(checkbox.dataset.target);
+                targetInput.disabled = !checkbox.checked;
+                if (!checkbox.checked) targetInput.value = '';
+                const student = students.find(s => s.id == paymentStudentId.value);
+                if (student) updateTotalPaid(student.price);
+            });
+        });
+
+        paymentAmounts.forEach(input => {
+            input.addEventListener('input', () => {
+                 const student = students.find(s => s.id == paymentStudentId.value);
+                 if (student) updateTotalPaid(student.price);
+            });
+        });
+
+        paymentForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = paymentStudentId.value;
+            const studentIndex = students.findIndex(s => s.id == id);
+            if (studentIndex === -1) return;
+
+            const paymentMethods = [];
+            let totalPaid = 0;
+            const breakdown = {};
+
+            if (document.getElementById('pay-pix-check').checked) {
+                const amount = parseFloat(document.getElementById('pay-pix-amount').value) || 0;
+                 if (amount > 0) {
+                    paymentMethods.push('Pix');
+                    breakdown['Pix'] = amount;
+                    totalPaid += amount;
+                }
+            }
+            if (document.getElementById('pay-dinheiro-check').checked) {
+                const amount = parseFloat(document.getElementById('pay-dinheiro-amount').value) || 0;
+                 if (amount > 0) {
+                    paymentMethods.push('Dinheiro');
+                    breakdown['Dinheiro'] = amount;
+                    totalPaid += amount;
+                }
+            }
+            if (document.getElementById('pay-cartao-check').checked) {
+                 const amount = parseFloat(document.getElementById('pay-cartao-amount').value) || 0;
+                 if (amount > 0) {
+                    paymentMethods.push('Cartão');
+                    breakdown['Cartão'] = amount;
+                    totalPaid += amount;
+                }
+            }
+
+            if (paymentMethods.length === 0) {
+                showAlertModal('Selecione ao menos uma forma de pagamento e insira um valor.');
+                return;
+            }
+            
+            const newPayment = {
+                studentId: students[studentIndex].id,
+                studentName: students[studentIndex].name,
+                amount: totalPaid,
+                breakdown: breakdown,
+                date: new Date().toISOString(),
+                paymentMethods: paymentMethods.join('/')
+            };
+            payments.push(newPayment);
+            savePayments();
+            
+            students[studentIndex].lastPaymentDate = students[studentIndex].dueDate;
+            students[studentIndex].dueDate = calculateDueDate(students[studentIndex].dueDate, students[studentIndex].plan);
+            students[studentIndex].paymentMethod = paymentMethods.join('/');
+            
+            saveStudents();
+            render();
+            closePaymentModal();
+        });
+
+        paymentModalCancelBtn.addEventListener('click', closePaymentModal);
+        paymentModal.addEventListener('click', (e) => e.target === paymentModal && closePaymentModal());
+
+        confirmModalConfirmBtn.addEventListener('click', () => actionToConfirm && actionToConfirm());
+        confirmModalCancelBtn.addEventListener('click', hideConfirmationModal);
+        confirmationModal.addEventListener('click', (e) => e.target === confirmationModal && hideConfirmationModal());
+
+        alertModalOkBtn.addEventListener('click', hideAlertModal);
+        alertModal.addEventListener('click', (e) => e.target === alertModal && hideAlertModal());
+        
+        importOptionsCancelBtn.addEventListener('click', hideImportOptionsModal);
+        importOptionsReplaceBtn.addEventListener('click', () => importActionHandler.replace && importActionHandler.replace());
+        importOptionsAddBtn.addEventListener('click', () => importActionHandler.add && importActionHandler.add());
+
+        const switchTab = (tabId) => {
+            activeTab = tabId;
+            selectedStudentId = null; // Deselect student when changing tabs
+            const allTabs = [tabActive, tabPending, tabTotal, tabDetails, tabArchived];
+            let activeTabText = '';
+
+            allTabs.forEach(tab => {
+                const isActive = tab.id === `tab-${tabId}`;
+                tab.classList.toggle('tab-active', isActive);
+                tab.classList.toggle('text-gray-400', !isActive);
+                if(isActive) {
+                    activeTabText = tab.textContent;
+                }
+            });
+            
+            mobileTabTitle.textContent = activeTabText;
+            if (window.innerWidth < 768) {
+                tabsWrapper.classList.add('hidden');
+            }
+
+            const isMainView = ['active', 'pending'].includes(tabId);
+            const isDetailsView = tabId === 'details';
+            const isArchivedView = tabId === 'archived';
+            
+            viewMain.classList.toggle('hidden', !isMainView);
+            viewTotal.classList.toggle('hidden', tabId !== 'total');
+            viewDetails.classList.toggle('hidden', !isDetailsView);
+            viewArchived.classList.toggle('hidden', !isArchivedView);
+            
+            const showActionPanel = ['active', 'pending', 'details', 'archived'].includes(tabId);
+            if (showActionPanel && window.innerWidth >= 768) {
+                actionPanel.classList.remove('hidden');
+                viewContainer.classList.remove('md:col-span-12');
+                viewContainer.classList.add('md:col-span-9');
+            } else {
+                actionPanel.classList.add('hidden');
+                viewContainer.classList.remove('md:col-span-9');
+                viewContainer.classList.add('md:col-span-12');
+            }
+            
+            searchContainerMain.classList.toggle('hidden', !isMainView);
+            sortContainer.classList.toggle('hidden', !isMainView);
+            
+            render();
+        }
+        tabActive.addEventListener('click', () => switchTab('active'));
+        tabPending.addEventListener('click', () => switchTab('pending'));
+        tabTotal.addEventListener('click', () => switchTab('total'));
+        tabDetails.addEventListener('click', () => switchTab('details'));
+        tabArchived.addEventListener('click', () => switchTab('archived'));
+
+        hamburgerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            tabsWrapper.classList.toggle('hidden');
+        });
+
+        dropdownBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
+        });
+
+        window.addEventListener('click', (event) => {
+            // Handle main "Import/Export" dropdown
+            if (!dropdownBtn.contains(event.target) && !dropdownContent.contains(event.target)) {
+                dropdownContent.style.display = 'none';
+            }
+
+            // Handle mobile hamburger menu
+            if (!hamburgerBtn.contains(event.target) && !tabsWrapper.contains(event.target)) {
+                tabsWrapper.classList.add('hidden');
+            }
+        });
+        
+        deleteAllBtn.addEventListener('click', () => {
+            showConfirmationModal(
+                'Excluir Todos os Alunos', 
+                'Tem certeza que deseja excluir TODOS os alunos e o histórico de pagamentos? Esta ação é irreversível.', 
+                'bg-red-800 hover:bg-red-700', 
+                () => {
+                    students = [];
+                    payments = [];
+                    saveStudents();
+                    savePayments();
+                    render();
+                    hideConfirmationModal();
+                }
+            );
+        });
+
+        totalValueContent.addEventListener('click', (e) => {
+            const deleteBtn = e.target.closest('.delete-history-btn');
+            if (deleteBtn) {
+                const monthYear = deleteBtn.dataset.monthYear;
+                const [year, month] = monthYear.split('-');
+                const monthName = new Date(year, month - 1, 1).toLocaleString('pt-BR', { month: 'long' });
+
+                showConfirmationModal(
+                    `Excluir Histórico de ${monthName}`,
+                    `Tem certeza que deseja excluir TODOS os pagamentos registrados em ${monthName} de ${year}? Esta ação é irreversível.`,
+                    'bg-red-800 hover:bg-red-700',
+                    () => {
+                        payments = payments.filter(p => {
+                            const paymentDate = new Date(p.date);
+                            const paymentMonthYear = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}`;
+                            return paymentMonthYear !== monthYear;
+                        });
+                        savePayments();
+                        render();
+                        hideConfirmationModal();
+                    }
+                );
+            }
+        });
+
+        // --- Inicialização ---
+        switchTab('active');
+    });
+    </script>
+</body>
+</html>
+
